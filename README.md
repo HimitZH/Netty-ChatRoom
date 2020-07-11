@@ -2,6 +2,7 @@
 使用Netty和Swing实现在线聊天室  
 具有心跳检测，断线重连，实时监控是否断线，进行有限次数的重连操作！
 # 功能:
+查看详细说明和演示图片，请看博文：[https://blog.csdn.net/weixin_43853097/article/details/107287541](https://blog.csdn.net/weixin_43853097/article/details/107287541)
 ## 服务端
 服务端负责转发消息，执行管理员命令，验证权限等。
 ## 起始登录窗口（GUI界面）
