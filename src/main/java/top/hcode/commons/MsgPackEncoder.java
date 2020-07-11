@@ -8,7 +8,7 @@ import org.msgpack.MessagePack;
 /**
  * @Author: Himit_ZH
  * @Date: 2020/7/6 23:17
- * @Description:
+ * @Description: 编码器，将要出战的对象转为Msgpack的传输格式。
  */
 public class MsgPackEncoder extends MessageToByteEncoder {
     protected void encode(ChannelHandlerContext channelHandlerContext, Object msg, ByteBuf byteBuf) throws Exception {

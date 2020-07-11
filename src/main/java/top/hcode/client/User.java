@@ -7,13 +7,12 @@ import top.hcode.commons.MsgModel;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.awt.image.ImageObserver;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @Author: Himit_ZH
  * @Date: 2020/7/7 23:06
- * @Description:
+ * @Description: User 普通用户的初始化聊天室窗口，继承总窗口类，实现初始化方法
  */
 
 public class User extends ClientFrame {
@@ -230,7 +229,7 @@ public class User extends ClientFrame {
         frame.setVisible(true);
 
         String name = JOptionPane.showInputDialog("请输入聊天所用昵称：");
-        if (name != null && !name.equals("")) {
+        if (!StringUtil.isNullOrEmpty(name)) { // 如果弹窗的昵称不为空，则设置昵称
             name_textfield.setText(name);
         }
     }

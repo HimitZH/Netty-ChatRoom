@@ -58,7 +58,6 @@ public class ChatRoomServerHandler extends ChannelInboundHandlerAdapter {
     //表示channel 处于活动状态, 提示 xx上线
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
-        Channel channel = ctx.channel(); //当前连接用户的通道
         System.out.println(ctx.channel().remoteAddress() + " 上线了~");
     }
 
@@ -94,11 +93,103 @@ public class ChatRoomServerHandler extends ChannelInboundHandlerAdapter {
 
     }
 
+    @Override
+    public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
+        ctx.flush();
+        super.channelReadComplete(ctx);
+    }
+
+
+    /**
+     * @MethodName userEventTriggered
+     * @Params * @param null
+     * @Description 每隔12s对客服端进行心跳检测，客户端未反应，表示客户端已出问题，关闭通道。
+     * @Return
+     * @Since 2020/7/7
+     */
+
+    @Override
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+        if (evt instanceof IdleStateEvent) {
+            IdleStateEvent event = (IdleStateEvent) evt;
+            if (event.state() == IdleState.READER_IDLE) {
+                System.out.println("该用户已超过心跳检测时间，未做出反应，关闭通道...");
+                ctx.close();
+                channelGroup.forEach(ch -> {
+                    AttributeKey<String> findKey = AttributeKey.valueOf(ch.id().asLongText());
+                    if (ch.attr(findKey).get().equals("admin")){  // 通知管理员
+                        ch.writeAndFlush(new MsgModel((byte) 3, (byte) 6,
+                                "<msg>ip为"+ctx.channel().remoteAddress()+
+                                        " 的用户["+userMap.get(ctx.channel())+"]上超过心跳检测的时间，系统强制关闭其通道。</time>"
+                                        + format(new Date()) + "</time>"));
+                    }
+                });
+            }
+        }
+    }
+
+    /**
+     * @MethodName exceptionCaught
+     * @Params * @param null
+     * @Description 发生异常，直接关闭该通道
+     * @Return
+     * @Since 2020/7/7
+     */
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        System.out.println(cause.getMessage());
+        if (ctx.channel().isActive()) {
+            ctx.close();
+        }
+    }
+
+
+    //handlerAdded 表示连接建立，一旦连接，第一个被执行
+    //将当前channel 加入到  channelGroup
+    @Override
+    public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
+        Channel channel = ctx.channel();
+        channelGroup.add(channel);
+        CopyOnWriteArraySet<String> myShieldList = new CopyOnWriteArraySet<>();
+        CopyOnWriteArraySet<String> otherShieldMeList = new CopyOnWriteArraySet<>();
+        myShieldMap.put(channel.id().asLongText(), myShieldList);
+        otherShieldMap.put(channel.id().asLongText(), otherShieldMeList);
+        userMap.put(channel, "未知"); //第一次加入未知昵称，需等客户端将昵称发过来
+    }
+
+    //断开连接, 将xx客户离开信息推送给当前在线的客户
+    @Override
+    public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+        Channel channel = ctx.channel();
+        //将我的屏蔽列表清空
+        if (!myShieldMap.get(channel.id().asLongText()).isEmpty()) {
+            myShieldMap.remove(channel.id().asLongText());
+        }
+        //将我的被屏蔽列表清空
+        if (!otherShieldMap.get(channel.id().asLongText()).isEmpty()) {
+            otherShieldMap.remove(channel.id().asLongText());
+        }
+
+
+        AttributeKey<String> findKey = AttributeKey.valueOf(channel.id().asLongText());
+        String sendMsg = "<id>" + channel.id().asLongText() +
+                "</id><name>" + userMap.get(channel) + "</name><authority>" +
+                channel.attr(findKey).get() + "</authority><time>" + format(new Date()) + "</time>";
+
+        //将该客户退出聊天的信息推送给所有在线的客户端
+        MsgModel notice = new MsgModel((byte) 3, (byte) 11, sendMsg);
+        channelGroup.writeAndFlush(notice);
+        userMap.remove(channel);
+    }
+
+
 
     protected void handlerUser(ChannelHandlerContext ctx, MsgModel msg) {
         //获取到当前channel
         Channel channel = ctx.channel();
-        switch (msg.getCode()) { //0.获取用户的昵称 1. 群聊 2.私聊 3.屏蔽某人 4.取消屏蔽 5.踢出某人 6.系统通知 7.管理员发布通知 8.心跳事件
+        switch (msg.getCode()) {
+            //0.获取用户的昵称 1. 群聊 2.私聊 3.屏蔽某人 4.取消屏蔽 5.踢出某人 6.系统通知 7.管理员发布通知 8.心跳事件 110.权限认证
             case 0: //获取用户的昵称，修改在线列表，并将当前在线用户的列表发给客户端,同时告知在线用户有人加入
                 userMap.put(channel, msg.getBody()); //给在线用户设置对应的昵称
                 MsgModel userList = new MsgModel((byte) 3, (byte) 9, getOnlineUserList(channel, msg.getBody()));
@@ -187,6 +278,7 @@ public class ChatRoomServerHandler extends ChannelInboundHandlerAdapter {
             case 7: //管理员发布系统消息
                 String adminMsg = "<admin>" + channel.id().asLongText() + "</admin><msg>"+msg.getBody()+"</msg><time>" + format(new Date()) + "</time>";
                 MsgModel adminMsgModel = new MsgModel((byte) 3, (byte) 7, adminMsg);
+                // 将管理员发布的系统消息发给每个在线用户
                 channelGroup.writeAndFlush(adminMsgModel);
             default:
                 System.out.println("管理员消息指令有误~~");
@@ -331,96 +423,6 @@ public class ChatRoomServerHandler extends ChannelInboundHandlerAdapter {
         }
     }
 
-
-    @Override
-    public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
-        ctx.flush();
-        super.channelReadComplete(ctx);
-    }
-
-
-    /**
-     * @MethodName userEventTriggered
-     * @Params * @param null
-     * @Description 每隔12s对客服端进行心跳检测，客户端未反应，表示客户端已出问题，关闭通道。
-     * @Return
-     * @Since 2020/7/7
-     */
-
-    @Override
-    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-        if (evt instanceof IdleStateEvent) {
-            IdleStateEvent event = (IdleStateEvent) evt;
-            if (event.state() == IdleState.READER_IDLE) {
-                System.out.println("该用户已超过心跳检测时间，未做出反应，关闭通道...");
-                ctx.close();
-                channelGroup.forEach(ch -> {
-                    AttributeKey<String> findKey = AttributeKey.valueOf(ch.id().asLongText());
-                    if (ch.attr(findKey).get().equals("admin")){  // 通知管理员
-                        ch.writeAndFlush(new MsgModel((byte) 3, (byte) 6,
-                                "<msg>ip为"+ctx.channel().remoteAddress()+
-                                        " 的用户["+userMap.get(ctx.channel())+"]上超过心跳检测的时间，系统强制关闭其通道。</time>"
-                                        + format(new Date()) + "</time>"));
-                    }
-                });
-            }
-        }
-    }
-
-    /**
-     * @MethodName exceptionCaught
-     * @Params * @param null
-     * @Description 发生异常，直接关闭该通道
-     * @Return
-     * @Since 2020/7/7
-     */
-
-    @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        System.out.println(cause.getMessage());
-        if (ctx.channel().isActive()) {
-            ctx.close();
-        }
-    }
-
-
-    //handlerAdded 表示连接建立，一旦连接，第一个被执行
-    //将当前channel 加入到  channelGroup
-    @Override
-    public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
-        Channel channel = ctx.channel();
-        channelGroup.add(channel);
-        CopyOnWriteArraySet<String> myShieldList = new CopyOnWriteArraySet<>();
-        CopyOnWriteArraySet<String> otherShieldMeList = new CopyOnWriteArraySet<>();
-        myShieldMap.put(channel.id().asLongText(), myShieldList);
-        otherShieldMap.put(channel.id().asLongText(), otherShieldMeList);
-        userMap.put(channel, "未知"); //第一次加入未知昵称，需等客户端将昵称发过来
-    }
-
-    //断开连接, 将xx客户离开信息推送给当前在线的客户
-    @Override
-    public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
-        Channel channel = ctx.channel();
-        //将我的屏蔽列表清空
-        if (!myShieldMap.get(channel.id().asLongText()).isEmpty()) {
-            myShieldMap.remove(channel.id().asLongText());
-        }
-        //将我的被屏蔽列表清空
-        if (!otherShieldMap.get(channel.id().asLongText()).isEmpty()) {
-            otherShieldMap.remove(channel.id().asLongText());
-        }
-
-
-        AttributeKey<String> findKey = AttributeKey.valueOf(channel.id().asLongText());
-        String sendMsg = "<id>" + channel.id().asLongText() +
-                "</id><name>" + userMap.get(channel) + "</name><authority>" +
-                channel.attr(findKey).get() + "</authority><time>" + format(new Date()) + "</time>";
-
-        //将该客户退出聊天的信息推送给所有在线的客户端
-        MsgModel notice = new MsgModel((byte) 3, (byte) 11, sendMsg);
-        channelGroup.writeAndFlush(notice);
-        userMap.remove(channel);
-    }
 
 
 }

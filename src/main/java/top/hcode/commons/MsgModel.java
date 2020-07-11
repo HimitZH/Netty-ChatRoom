@@ -11,7 +11,7 @@ import java.io.Serializable;
 /**
  * @Author: Himit_ZH
  * @Date: 2020/7/6 23:28
- * @Description:
+ * @Description: 传输的协议pojo
  */
 @Message
 @NoArgsConstructor

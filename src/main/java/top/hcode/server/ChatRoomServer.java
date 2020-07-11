@@ -12,7 +12,7 @@ import io.netty.util.internal.StringUtil;
 /**
  * @Author: Himit_ZH
  * @Date: 2020/7/6 22:50
- * @Description:
+ * @Description: 服务端启动初始化，负责开启服务
  */
 public class ChatRoomServer {
 

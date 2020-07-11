@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * @Author: Himit_ZH
  * @Date: 2020/7/10 14:57
- * @Description:
+ * @Description: Admin 管理员的初始化聊天室窗口，继承总窗口类，实现初始化方法
  */
 public class Admin extends ClientFrame {
 
@@ -161,11 +161,12 @@ public class Admin extends ClientFrame {
         panel.add(centerpanel, "Center");
 
         //将按钮事件全部注册到监听器
-        //开启服务
+
+        //连接聊天室
         head_connect.addActionListener(chatRoomClient);
-        // 管理员发布消息
+        //管理员发布消息
         foot_send.addActionListener(chatRoomClient);
-        //关闭服务器
+        //退出聊天室
         head_exit.addActionListener(chatRoomClient);
         //清空消息日志
         foot_sysSend.addActionListener(chatRoomClient);
@@ -202,13 +203,14 @@ public class Admin extends ClientFrame {
             @Override
             public void keyTyped(KeyEvent e) {
 
-                if (e.getKeyChar() == KeyEvent.VK_ENTER) {
-                    if (ChatRoomClient.socketChannel != null && !ChatRoomClient.socketChannel.isActive()) {
-                        JOptionPane.showMessageDialog(frame, "请先连接服务器进入聊天室！", "提示", JOptionPane.WARNING_MESSAGE);
-                        return;
-                    }
-                    String text = text_field.getText();
-                    if (!StringUtil.isNullOrEmpty(text)) {
+                if (e.getKeyChar() == KeyEvent.VK_ENTER) { //监听回车键
+                    String text = text_field.getText(); // 获取群聊消息输入框的内容
+                    if (!StringUtil.isNullOrEmpty(text)) { // 输入框内应该不为空
+                        //先判断是否进入了聊天室。没进入则报错提醒！
+                        if (ChatRoomClient.socketChannel != null && !ChatRoomClient.socketChannel.isActive()) {
+                            JOptionPane.showMessageDialog(frame, "请先连接服务器进入聊天室！", "提示", JOptionPane.WARNING_MESSAGE);
+                            return;
+                        }
                         String formatMsg = "<id>" + userId + "</id>" + "<msg>" + text + "</msg>";
                         MsgModel msgModel = new MsgModel((byte) 2, (byte) 1, formatMsg);
                         chatRoomClient.getSocketChannel().writeAndFlush(msgModel); //写入通道
@@ -218,11 +220,31 @@ public class Admin extends ClientFrame {
             }
         });
 
+        //发送系统消息的输入框的监听回车按钮事件
+        sysText_field.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyTyped(KeyEvent e) {
+                if (e.getKeyChar() == KeyEvent.VK_ENTER) { //如果按下的是回车
+                    String text = sysText_field.getText(); // 获取系统消息输入框的内容
+                    if (!StringUtil.isNullOrEmpty(text)) { // 输入框内应该不为空
+                        //先判断是否进入了聊天室。没进入则报错提醒！
+                        if (ChatRoomClient.socketChannel != null && !ChatRoomClient.socketChannel.isActive()) {
+                            JOptionPane.showMessageDialog(frame, "请先连接服务器进入聊天室！", "提示", JOptionPane.WARNING_MESSAGE);
+                            return;
+                        }
+                        MsgModel adminSysModel = new MsgModel((byte) 1, (byte) 7, text);
+                        chatRoomClient.getSocketChannel().writeAndFlush(adminSysModel); //写入通道
+                        sysText_field.setText("");
+                    }
+                }
+            }
+        });
+
         //窗口显示
         frame.setVisible(true);
 
         String name = JOptionPane.showInputDialog("请输入聊天所用昵称：");
-        if (name != null && !name.equals("")) {
+        if (!StringUtil.isNullOrEmpty(name)) { // 如果弹窗的昵称不为空，则设置昵称
             name_textfield.setText(name);
         }
 

@@ -1,10 +1,6 @@
 package top.hcode.client;
 
-/**
- * @Author: Himit_ZH
- * @Date: 2020/7/7 20:36
- * @Description:
- */
+
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
@@ -24,8 +20,11 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 重连检测狗，当发现当前的链路不稳定关闭之后，进行5次重连
+ * @Author: Himit_ZH
+ * @Date: 2020/7/7 20:36
+ * @Description: 重连检测狗，当发现当前的链路不稳定关闭之后（触发离线状态的方法），进行12次重连
  */
+
 @ChannelHandler.Sharable
 public abstract class ConnectionWatchdog extends ChannelInboundHandlerAdapter implements TimerTask, ChannelHandlerHolder {
 
@@ -36,7 +35,7 @@ public abstract class ConnectionWatchdog extends ChannelInboundHandlerAdapter im
     private final String host;
 
     private volatile boolean reconnect = true;
-    private int attempts;
+    private int attempts; // 当前尝试重连次数
 
     private final static int MAX_RECONNECT_COUNT = 12; //重连次数
 
@@ -71,13 +70,16 @@ public abstract class ConnectionWatchdog extends ChannelInboundHandlerAdapter im
                     null, "[系统消息] " + format(new Date()),
                     "当前客户端重连成功！您已成功进入聊天室！", clientFrame.sysVertical, true);
         }
-        attempts = 0;
+        attempts = 0;//重连成功，将重连次数重置为0，方便下次重连
         ctx.fireChannelActive();
     }
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-
+        /**
+         *  判断是否开启重连操作，需要鉴定是否为网络异常条件，若是手动断链退出聊天室的，
+         *  ChatRoomClient.isReConnect为false 不开启重连操作，若是网络异常断链，则进行12次重连操作
+         */
         if (reconnect && ChatRoomClient.isReConnect) {
             ClientFrame clientFrame = ChatRoomClient.clientFrame;
             if (attempts==0){
@@ -94,7 +96,7 @@ public abstract class ConnectionWatchdog extends ChannelInboundHandlerAdapter im
                 JOptionPane.showMessageDialog(clientFrame.frame, "┭┮﹏┭┮对不起！由于您与服务器的连接处于离线状态，系统君开始为您尝试进行重连...",
                         "提示", JOptionPane.INFORMATION_MESSAGE);
             }
-            if (attempts < MAX_RECONNECT_COUNT) {
+            if (attempts < MAX_RECONNECT_COUNT) { //重连失败，且小于最大重连次数，继续进行重连。
                 attempts++;
                 clientFrame.insertMessage(clientFrame.sysTextScrollPane, clientFrame.sysMsgArea,
                         null, "[系统消息] " + format(new Date()),
@@ -102,13 +104,21 @@ public abstract class ConnectionWatchdog extends ChannelInboundHandlerAdapter im
                 //重连的间隔时间会越来越长
                 int timeout = 2 << attempts;
                 timer.newTimeout(this, timeout, TimeUnit.MILLISECONDS);
-            }else{
+            }else{ // 超过最大重连次数，重连失败，重置聊天室一切参数
                 clientFrame.showEscDialog("<( _ _ )>对不起！由于系统君多次重连依旧失败，请您重启客户端再次尝试！", null);
             }
         }
         ctx.fireChannelInactive();
     }
 
+
+    /**
+     * @MethodName
+     * @Params  * @param null
+     * @Description 定时任务，处理重连操作
+     * @Return
+     * @Since 2020/7/11
+     */
     @Override
     public void run(Timeout timeout) throws Exception {
 
@@ -130,6 +140,7 @@ public abstract class ConnectionWatchdog extends ChannelInboundHandlerAdapter im
             public void operationComplete(ChannelFuture f) throws Exception {
                 boolean succeed = f.isSuccess();
                 ClientFrame clientFrame = ChatRoomClient.clientFrame;
+
                 //如果重连失败，则调用ChannelInactive方法，再次出发重连事件，一直尝试12次，如果失败则不再重连
                 if (!succeed) {
                     clientFrame.insertMessage(clientFrame.sysTextScrollPane, clientFrame.sysMsgArea,
@@ -137,7 +148,7 @@ public abstract class ConnectionWatchdog extends ChannelInboundHandlerAdapter im
                             "X﹏X失败！此次重连服务器失败！......", clientFrame.sysVertical, true);
 
                     f.channel().pipeline().fireChannelInactive();
-                } else {
+                } else { //重连成功，重新回到聊天室
                     clientFrame.insertMessage(clientFrame.sysTextScrollPane, clientFrame.sysMsgArea,
                             null, "[系统消息] " + format(new Date()),
                             "(●'◡'●)成功！经过系统君不懈重连，您已重新进入聊天室！", clientFrame.sysVertical, true);

@@ -55,8 +55,6 @@ public class ChatRoomClient implements ActionListener {
 
     public static String order;
 
-    public static String role;
-
     public SocketChannel getSocketChannel() {
         return socketChannel;
     }
@@ -178,6 +176,14 @@ public class ChatRoomClient implements ActionListener {
         group.shutdownGracefully(); //优雅的关闭
     }
 
+
+    /**
+     * @MethodName actionPerformed
+     * @Params  * @param null
+     * @Description 监听登录界面，管理端或者用户端的按钮操作！
+     * @Return
+     * @Since 2020/7/11
+     */
     @Override
     public void actionPerformed(ActionEvent e) {
         String cmd = e.getActionCommand();
@@ -385,9 +391,9 @@ public class ChatRoomClient implements ActionListener {
                     JOptionPane.showMessageDialog(clientFrame.frame, "请先连接服务器进入聊天室！", "提示", JOptionPane.WARNING_MESSAGE);
                     break;
                 }
-                String adminSysMsg = clientFrame.text_field.getText();
+                String adminSysMsg = clientFrame.sysText_field.getText();
                 if (!StringUtil.isNullOrEmpty(adminSysMsg)) {
-                    MsgModel adminSysModel = new MsgModel((byte) 2, (byte) 1, adminSysMsg);
+                    MsgModel adminSysModel = new MsgModel((byte) 1, (byte) 7, adminSysMsg);
                     chatRoomClient.getSocketChannel().writeAndFlush(adminSysModel); //写入通道
                     clientFrame.sysText_field.setText("");
                 }

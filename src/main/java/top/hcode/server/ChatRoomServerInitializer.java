@@ -11,6 +11,13 @@ import top.hcode.commons.MsgPackDecoder;
 import top.hcode.commons.MsgPackEncoder;
 
 
+/**
+ * @Params
+ * @Description 管道pipeline初始化，将处理器handler加入到管道里面
+ * @Return
+ * @Since 2020/7/11
+ */
+
 public class ChatRoomServerInitializer extends ChannelInitializer<SocketChannel> {
 
     @Override

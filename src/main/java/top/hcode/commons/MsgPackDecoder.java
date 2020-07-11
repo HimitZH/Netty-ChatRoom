@@ -11,7 +11,7 @@ import java.util.List;
 /**
  * @Author: Himit_ZH
  * @Date: 2020/7/6 23:17
- * @Description:
+ * @Description: 解码器，负责将进站的参数协议进行转换成对象。
  */
 public class MsgPackDecoder extends MessageToMessageDecoder<ByteBuf> {
 

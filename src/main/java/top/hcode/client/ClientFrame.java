@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
 /**
  * @Author: Himit_ZH
  * @Date: 2020/7/10 00:15
- * @Description:
+ * @Description: Swing窗口父类，管理管理端和用户端的参数和操作方法
  */
 public abstract class ClientFrame {
 
@@ -96,12 +96,6 @@ public abstract class ClientFrame {
     }
 
 
-    public synchronized String addAutoId(String name) {
-
-        Integer integer = repeatNameCount.get(name) + 1;
-        repeatNameCount.put(name, integer);
-        return integer.toString();
-    }
 
     public ClientFrame(ChatRoomClient chatRoomClient) {
         this.chatRoomClient = chatRoomClient;
@@ -111,6 +105,22 @@ public abstract class ClientFrame {
     // 抽象方法 实现界面初始化 等待子类重写
     public abstract void frameInit();
 
+
+    // 处理重名问题，如果有多个昵称相同在名字后面添加(num)
+    public synchronized String addAutoId(String name) {
+
+        int num = repeatNameCount.get(name) + 1;
+        for (int i = 0; i < num; i++) {
+            if (i==0 && !users_map.containsKey(name)){
+                return null;
+            }
+            else if(!users_map.containsKey(name + "(" + i + ")")&&i!=0){
+                return String.valueOf(i);
+            }
+        }
+        repeatNameCount.put(name, num);
+        return String.valueOf(num);
+    }
 
     /**
      * @MethodName ipCheck
@@ -160,7 +170,7 @@ public abstract class ClientFrame {
     public void updateTextArea(String content, String where) {
         if (content.length() > 0) {
             Matcher matcher = null;
-            if (where.equals("user")) {
+            if (where.equals("user")) { //更新群聊消息到世界聊天窗口
                 Pattern pattern = Pattern.compile("<id>(.*)</id><name>(.*)</name><msg>(.*)</msg><time>(.*)</time>");
                 matcher = pattern.matcher(content);
                 if (matcher.find()) {
@@ -176,7 +186,7 @@ public abstract class ClientFrame {
                     }
                     insertMessage(userTextScrollPane, userMsgArea, null, userName + " " + time, " " + userMsg, userVertical, false);
                 }
-            } else {
+            } else if (where.equals("sys")) { //更新系统消息
                 Pattern sysPattern = Pattern.compile("<msg>(.*)</msg><time>(.*)</time>");
                 matcher = sysPattern.matcher(content);
                 if (matcher.find()) { //处理系统消息
@@ -184,9 +194,9 @@ public abstract class ClientFrame {
                     String sysTime = matcher.group(2);
                     insertMessage(sysTextScrollPane, sysMsgArea, null, "[系统消息] " + sysTime, sysMsg, sysVertical, true);
                 }
-                //有可能是管理员发布的系统消息
-                Pattern pattern = Pattern.compile("<admin>(.*)</admin><msg>(.*)</msg><time>(.*)</time>");
-                matcher = pattern.matcher(content);
+            } else if (where.equals("admin")) {  //更新管理员发布的系统消息
+                Pattern adminPattern = Pattern.compile("<admin>(.*)</admin><msg>(.*)</msg><time>(.*)</time>");
+                matcher = adminPattern.matcher(content);
                 if (matcher.find()) {
                     String adminId = matcher.group(1);
                     String adminMsg = matcher.group(2);
@@ -264,6 +274,14 @@ public abstract class ClientFrame {
         return "未知";
     }
 
+    /**
+     * @MethodName beKick
+     * @Params * @param null
+     * @Description 处理某人被踢的相关操作方法，可能是自己，也可能是别人
+     * @Return
+     * @Since 2020/7/11
+     */
+
     protected void beKick(String content) {
         if (content.length() > 0) {
             Pattern pattern = Pattern.compile("<admin>(.*)</admin><kick>(.*)</kick><time>(.*)</time>");
@@ -287,6 +305,14 @@ public abstract class ClientFrame {
             }
         }
     }
+
+    /**
+     * @MethodName disConnect
+     * @Params * @param null
+     * @Description 手动断开与服务器的操作方法
+     * @Return
+     * @Since 2020/7/11
+     */
 
     protected void disConnect() {
         userMsgArea.setText("");
@@ -368,20 +394,26 @@ public abstract class ClientFrame {
                     if (!id.equals(userId)) {
                         if (authority.equals("admin")) {
                             String temp = "[管理员] " + name;
-                            if (repeatNameCount.containsKey(name)) {
-                                temp = temp + "(" + addAutoId(name) + ")";
+                            if (repeatNameCount.containsKey(temp)) {
+                                String num = addAutoId(temp);
+                                if (num!=null){
+                                    temp = temp + "(" + num + ")";
+                                }
                             } else {
-                                repeatNameCount.put(name, 0);
+                                repeatNameCount.put(temp, 0);
                             }
                             users_map.put(temp, id);
-                            users_model.addElement(temp);
+                            users_model.insertElementAt(temp, 1);
 
                         } else {
                             String temp = "[用户] " + name;
-                            if (repeatNameCount.containsKey(name)) {
-                                temp = temp + "(" + addAutoId(name) + ")";
+                            if (repeatNameCount.containsKey(temp)) {
+                                String num = addAutoId(temp);
+                                if (num!=null){
+                                    temp = temp + "(" + num + ")";
+                                }
                             } else {
-                                repeatNameCount.put(name, 0);
+                                repeatNameCount.put(temp, 0);
                             }
                             users_map.put(temp, id);
                             users_model.addElement(temp);
@@ -442,6 +474,7 @@ public abstract class ClientFrame {
             numMatcher = numPattern.matcher(content);
             //遍历字符串，进行正则匹配，获取所有用户信息
             boolean me = true;
+            int num = 0;
             while (numMatcher.find()) {
                 String detail = numMatcher.group(1);
                 userListPattern = Pattern.compile("<id>(.*)</id><name>(.*)</name><authority>(.*)</authority>");
@@ -452,23 +485,34 @@ public abstract class ClientFrame {
                     auth = userListMatcher.group(3);
                     if (auth.equals("admin")) {
                         String temp = "[管理员] " + name;
-                        if (repeatNameCount.containsKey(name)) {
-                            temp = temp + "(" + addAutoId(name) + ")";
+                        if (repeatNameCount.containsKey(temp)) {
+                            String nameNum = addAutoId(temp);
+                            if (nameNum!=null){
+                                temp = temp + "(" + num + ")";
+                            }
                         } else {
-                            repeatNameCount.put(name, 0);
+                            repeatNameCount.put(temp, 0);
                         }
                         users_map.put(temp, id);
-                        users_model.insertElementAt(temp, 0);
+                        if (me){ //如果是自己管理员
+                            users_model.insertElementAt(temp, 0);
+                        }else { //如果是别人管理员
+                            users_model.insertElementAt(temp, 1);
+                        }
                     } else {
                         String temp = "[用户] " + name;
-                        if (repeatNameCount.containsKey(name)) {
-                            temp = temp + "(" + addAutoId(name) + ")";
+                        if (repeatNameCount.containsKey(temp)) {
+                            String nameNum = addAutoId(temp);
+                            if (nameNum!=null){
+                                temp = temp + "(" + num + ")";
+                            }
                         } else {
-                            repeatNameCount.put(name, 0);
+                            repeatNameCount.put(temp, 0);
                         }
                         users_map.put(temp, id);
                         users_model.addElement(temp);
                     }
+                    userlist.ensureIndexIsVisible(num++);
                     if (me) {
                         userId = id;
                         userName = name;
@@ -478,7 +522,7 @@ public abstract class ClientFrame {
             }
 
         }
-        userlist.updateUI();
+
         users_label.setText("聊天室内人数：" + users_map.size());
     }
 
