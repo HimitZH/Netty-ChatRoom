@@ -106,21 +106,6 @@ public abstract class ClientFrame {
     public abstract void frameInit();
 
 
-    // 处理重名问题，如果有多个昵称相同在名字后面添加(num)
-    public synchronized String addAutoId(String name) {
-
-        int num = repeatNameCount.get(name) + 1;
-        for (int i = 0; i < num; i++) {
-            if (i==0 && !users_map.containsKey(name)){
-                return null;
-            }
-            else if(!users_map.containsKey(name + "(" + i + ")")&&i!=0){
-                return String.valueOf(i);
-            }
-        }
-        repeatNameCount.put(name, num);
-        return String.valueOf(num);
-    }
 
     /**
      * @MethodName ipCheck
@@ -373,6 +358,25 @@ public abstract class ClientFrame {
         JOptionPane.showMessageDialog(frame, content, "提示", JOptionPane.WARNING_MESSAGE);
 
     }
+
+
+    // 处理重名问题，如果有多个昵称相同在名字后面添加(num)
+    public synchronized String addAutoId(String name) {
+
+        int num = repeatNameCount.get(name) + 1;
+        for (int i = 0; i < num; i++) {
+            if (i==0 && !users_map.containsKey(name)){
+                return null;
+            }
+            else if(!users_map.containsKey(name + "(" + i + ")")&&i!=0){
+                return String.valueOf(i);
+            }
+        }
+        repeatNameCount.put(name, num);
+        return String.valueOf(num);
+    }
+
+    
 
     /**
      * @MethodName addUser
